@@ -121,6 +121,9 @@ int main (int argc, char** argv) {
 		// This child will write into sv2[0] and sv3[0]
 		// and read from sv1[1]
 		// for proper hygiene, do some closes here
+		// close(sv2[1]);
+		// close(sv3[1]);
+		// close(sv1[0]);
 		write(sv2[0], s, strlen(s));
 		int child1_logical_clock_time = 0;
 		ll* c1_ll = malloc(sizeof(ll));
@@ -140,6 +143,15 @@ int main (int argc, char** argv) {
 	pid_t child2 = fork();
 
 	if (child2 == 0) {
+		// This child will write into sv1[0] and sv3[0]
+		// and read from sv2[1]
+
+		// close(sv1[1]);
+		// close(sv3[1]);
+		// close(sv2[0]);
+		ll* c2_ll = malloc(sizeof(ll));
+		c2_ll->head = NULL;
+		c2_ll->length = 0;
 		char* buf = malloc(100);
 		read(sv2[1], buf, strlen(s));
 		int child2_logical_clock_time = 0;
@@ -158,6 +170,14 @@ int main (int argc, char** argv) {
 	pid_t child3 = fork();
 
 	if (child3 == 0) {
+		// This child will write into sv1[0] and sv2[0]
+		// and read from sv3[1]
+		// close(sv1[1]);
+		// close(sv2[1]);
+		// close(sv3[0]);
+		ll* c3_ll = malloc(sizeof(ll));
+		c3_ll->head = NULL;
+		c3_ll->length = 0;
 		int child3_logical_clock_time = 0;
 		int fd3 = open("child3log.txt", O_RDWR | O_CREAT, 0777);
 		write(fd3, "CHILD 3 START\n", 15);
