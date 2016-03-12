@@ -9,14 +9,7 @@
 #include <assert.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-
-typedef struct queue_thread_arg {
-	// TODO: anything we want to pass to the queue thr
-} queue_thread_arg;
-
-typedef struct processing_thread_arg {
-	// TODO: anything we want to pass to processing thr
-} processing_thread_arg;
+#include <time.h>
 
 typedef struct value_type {
 	// TODO: this is what's going to be the value in the ll
@@ -33,6 +26,18 @@ typedef struct ll {
 	node* head;
 	int length;
 } ll;
+
+typedef struct queue_thread_arg {
+	// TODO: anything we want to pass to the queue thr
+} queue_thread_arg;
+
+typedef struct processing_thread_arg {
+	// Need the queue, logical clock time, fds to write to
+	ll* q;
+	int* logical_clock_time;
+	int writefd1;
+	int writefd2;
+} processing_thread_arg;
 
 void push(value_type v, ll* l) {
 	node* new_node = malloc(sizeof(node));
@@ -82,22 +87,64 @@ void ll_test(void) {
 }
 
 void* queue_thread(void* arg) {
-	// Accept on this process's socket.
-	unsigned int s, s2;
-	struct sockaddr_un local, remote;
-	int len;
-
-	s = socket(AF_UNIX, SOCK_STREAM, 0);
+	
 	return NULL;
 }
 
+
+/*
+
+On each clock cycle, if there is a message in the message queue for the machine
+(remember, the queue is not running at the same cycle speed) the virtual machine
+should take one message off the queue, update the local logical clock, and write
+that it received a message, the global time (gotten from the system), the length
+of the message queue, and the logical clock time.
+
+If there is no message in the queue, the virtual machine should generate a
+random number in the range of 1-10, and
+
+if the value is 1, send to one of the other machines a message that is the
+	local logical clock time, update it’s own logical clock, and update the
+	log with the send, the system time, and the logical clock time
+if the value is 2, send to the other virtual machine a message that is the
+	local logical clock time, update it’s own logical clock, and update the log
+	with the send, the system time, and the logical clock time.
+if the value is 3, send to both of the other virtual machines a message that is
+	the logical clock time, update it’s own logical clock, and update the log
+	with the send, the system time, and the logical clock time.
+if the value is other than 1-3, treat the cycle as an internal event; update
+	the local logical clock, and log the internal event, the system time, and
+	the logical clock value.
+*/
+
 void* processing_thread(void* arg) {
+	processing_thread_arg* pta = (processing_thread_arg*)arg;
 	// Open up sockets to the other processes to send msgs
+	while (1) {
+		if (pta->q->head == NULL) {
+			// The queue is empty
+			int r = (rand() % 10) + 1;
+			if (r == 1) {
+
+			}
+			else if (r == 2) {
+
+			}
+			else if (r == 3) {
+
+			}
+			else {
+
+			}
+		}
+		break;
+	}
 	return NULL;
 }
 
 int main (int argc, char** argv) {
-
+	srand((unsigned)time(NULL));
+	
 	// Set up bidirectional socket connections.
 	// We can then pass these into the various threads
 	// for communication purposes.
