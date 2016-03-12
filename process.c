@@ -83,6 +83,11 @@ void ll_test(void) {
 
 void* queue_thread(void* arg) {
 	// Accept on this process's socket.
+	unsigned int s, s2;
+	struct sockaddr_un local, remote;
+	int len;
+
+	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	return NULL;
 }
 
@@ -92,6 +97,18 @@ void* processing_thread(void* arg) {
 }
 
 int main (int argc, char** argv) {
+
+	// Set up bidirectional socket connections.
+	// We can then pass these into the various threads
+	// for communication purposes.
+	int sv1[2];
+	int sv2[2];
+	int sv3[2];
+    char buf;
+
+    assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv1) != -1);
+	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv2) != -1);
+	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv3) != -1);
 
 	// Test the very simple linked list implementation
 	ll_test();
