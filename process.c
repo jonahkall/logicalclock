@@ -10,11 +10,13 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <time.h>
+#include <stdbool.h>
 
 typedef struct value_type {
 	// TODO: this is what's going to be the value in the ll
 	// which gets put on the queue.
 	int test;
+	int clock_time;
 } value_type;
 
 typedef struct node {
@@ -32,7 +34,6 @@ typedef struct queue_thread_arg {
 } queue_thread_arg;
 
 typedef struct processing_thread_arg {
-	// Need the queue, logical clock time, fds to write to
 	ll* q;
 	int* logical_clock_time;
 	int writefd1;
@@ -97,7 +98,9 @@ int max(int x, int y) {
 }
 
 void* queue_thread(void* arg) {
-	
+	while (1) {
+		int j = 0;
+	}
 	return NULL;
 }
 
@@ -133,12 +136,13 @@ void* processing_thread(void* arg) {
 	float speed = (float)((rand() % 6) + 1);
 	while (1) {
 		usleep((1.0/speed) * 1000000);
+		char* buf = malloc(100); // this will hold the log message
+		time_t rawtime;
+		struct tm* timeinfo;
+		time(&rawtime);
+		timeinfo = localtime(&rawtime);
 		if (pta->q->length == 0) {
 			// The queue is empty
-			time_t rawtime;
-			struct tm* timeinfo;
-			time(&rawtime);
-			timeinfo = localtime(&rawtime);
 
 			int r = (rand() % 10) + 1;
 			if (r == 1) {
@@ -146,24 +150,20 @@ void* processing_thread(void* arg) {
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
 				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
-				char* buf = malloc(100);
 				int n = sprintf(buf,
 					"System time is: %s, logical clock value is: %d\n",
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
-				free(buf);
 			}
 			else if (r == 2) {
 				// send to writefd2
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
 				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
-				char* buf = malloc(100);
 				int n = sprintf(buf,
 					"System time is: %s, logical clock value is: %d\n",
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
-				free(buf);
 			}
 			else if (r == 3) {
 				// send to both writefd1 and writefd2
@@ -171,12 +171,10 @@ void* processing_thread(void* arg) {
 				write(pta->writefd1, (char*)&to_send, 4);
 				write(pta->writefd2, (char*)&to_send, 4);
 				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
-				char* buf = malloc(100);
 				int n = sprintf(buf,
 					"System time is: %s, logical clock value is: %d\n",
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
-				free(buf);
 			}
 			else {
 				// update the local logical clock
@@ -187,6 +185,7 @@ void* processing_thread(void* arg) {
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
 			}
+			free(buf);
 		}
 		else {
 			// There is a message in the queue, process it
@@ -196,11 +195,23 @@ void* processing_thread(void* arg) {
 				to_process->v.clock_time);
 			// write that it received message, global time, length of msg q,
 			// current logical clock time
-			
+			int n = sprintf(buf,
+				"Received Message! System time is: %s, logical clock value is:"
+				" %d, length of message queue: %d\n",
+				asctime(timeinfo), *(pta->logical_clock_time), pta->q->length);
+			write(pta->logfd, buf, n);
 		}
-		break;
 	}
 	return NULL;
+}
+
+void init_processing_thread_arg(processing_thread_arg* p, int* lct, int wfd1,
+		int wfd2, int lfd, ll* q) {
+	p->logical_clock_time = lct;
+	p->writefd1 = wfd1;
+	p->writefd2 = wfd2;
+	p->logfd = lfd;
+	p->q = q;
 }
 
 int main (int argc, char** argv) {
@@ -239,13 +250,21 @@ int main (int argc, char** argv) {
 		c1_ll->length = 0;
 		int fd1 = open("child1log.txt", O_RDWR | O_CREAT, 0777);
 		write(fd1, "CHILD 1 START\n", 15);
+
+		// Argument to be passed into the processing thread
+		processing_thread_arg* p = malloc(sizeof(processing_thread_arg));
+		init_processing_thread_arg(p, &child1_logical_clock_time,
+				sv2[0], sv3[0], fd1, c1_ll);
+
+		// Create and start threads
 		pthread_t qt1;
 		pthread_t pt1;
 		assert(pthread_create(&qt1, NULL, queue_thread, NULL) == 0);
-		assert(pthread_create(&pt1, NULL, processing_thread, NULL) == 0);
+		assert(pthread_create(&pt1, NULL, processing_thread, (void*)p) == 0);
 		pthread_join(pt1, NULL);
 		pthread_join(qt1, NULL);
 
+		free(p);
 	}
 
 	pid_t child2 = fork();
@@ -260,19 +279,27 @@ int main (int argc, char** argv) {
 		ll* c2_ll = malloc(sizeof(ll));
 		c2_ll->head = NULL;
 		c2_ll->length = 0;
-		char* buf = malloc(100);
-		read(sv2[1], buf, strlen(s));
+		//char* buf = malloc(100);
+		//read(sv2[1], buf, strlen(s));
 		int child2_logical_clock_time = 0;
 		int fd2 = open("child2log.txt", O_RDWR | O_CREAT, 0777);
 		write(fd2, "CHILD 2 START\n", 15);
-		write(fd2, "recv:", 6);
-		write(fd2, buf, strlen(s));
+		// write(fd2, "recv:", 6);
+		// write(fd2, buf, strlen(s));
+
+		// Argument to be passed into the processing thread
+		processing_thread_arg* p = malloc(sizeof(processing_thread_arg));
+		init_processing_thread_arg(p, &child2_logical_clock_time,
+				sv1[0], sv3[0], fd2, c2_ll);
+
 		pthread_t qt2;
 		pthread_t pt2;
 		assert(pthread_create(&qt2, NULL, queue_thread, NULL) == 0);
-		assert(pthread_create(&pt2, NULL, processing_thread, NULL) == 0);
+		assert(pthread_create(&pt2, NULL, processing_thread, (void*)p) == 0);
 		pthread_join(pt2, NULL);
 		pthread_join(qt2, NULL);
+
+		free(p);
 	}
 
 	pid_t child3 = fork();
@@ -289,13 +316,25 @@ int main (int argc, char** argv) {
 		int child3_logical_clock_time = 0;
 		int fd3 = open("child3log.txt", O_RDWR | O_CREAT, 0777);
 		write(fd3, "CHILD 3 START\n", 15);
+
+		// Argument to be passed into the processing thread
+		processing_thread_arg* p = malloc(sizeof(processing_thread_arg));
+		init_processing_thread_arg(p, &child3_logical_clock_time,
+				sv1[0], sv2[0], fd3, c3_ll);
+
 		pthread_t qt3;
 		pthread_t pt3;
 		assert(pthread_create(&qt3, NULL, queue_thread, NULL) == 0);
-		assert(pthread_create(&pt3, NULL, processing_thread, NULL) == 0);
+		assert(pthread_create(&pt3, NULL, processing_thread, (void*)p) == 0);
 		pthread_join(pt3, NULL);
 		pthread_join(qt3, NULL);
+
+		free(p);
 	}
+
+	waitpid(child1, NULL, 0);
+	waitpid(child2, NULL, 0);
+	waitpid(child3, NULL, 0);
 
 	return 0;
 }
