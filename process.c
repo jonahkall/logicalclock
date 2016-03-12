@@ -37,6 +37,7 @@ typedef struct processing_thread_arg {
 	int* logical_clock_time;
 	int writefd1;
 	int writefd2;
+	int logfd;
 } processing_thread_arg;
 
 void push(value_type v, ll* l) {
@@ -86,6 +87,15 @@ void ll_test(void) {
 	printf("LL test looks good!\n");
 }
 
+int max(int x, int y) {
+	if (x > y) {
+		return x;
+	}
+	else {
+		return y;
+	}
+}
+
 void* queue_thread(void* arg) {
 	
 	return NULL;
@@ -120,22 +130,73 @@ if the value is other than 1-3, treat the cycle as an internal event; update
 void* processing_thread(void* arg) {
 	processing_thread_arg* pta = (processing_thread_arg*)arg;
 	// Open up sockets to the other processes to send msgs
+	float speed = (float)((rand() % 6) + 1);
 	while (1) {
-		if (pta->q->head == NULL) {
+		usleep((1.0/speed) * 1000000);
+		if (pta->q->length == 0) {
 			// The queue is empty
+			time_t rawtime;
+			struct tm* timeinfo;
+			time(&rawtime);
+			timeinfo = localtime(&rawtime);
+
 			int r = (rand() % 10) + 1;
 			if (r == 1) {
-
+				// send to writefd1
+				int to_send = *(pta->logical_clock_time);
+				write(pta->writefd1, &to_send, 4);
+				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
+				char* buf = malloc(100);
+				int n = sprintf(buf,
+					"System time is: %s, logical clock value is: %d\n",
+					asctime(timeinfo), *(pta->logical_clock_time));
+				write(pta->logfd, buf, n);
+				free(buf);
 			}
 			else if (r == 2) {
-
+				// send to writefd2
+				int to_send = *(pta->logical_clock_time);
+				write(pta->writefd1, &to_send, 4);
+				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
+				char* buf = malloc(100);
+				int n = sprintf(buf,
+					"System time is: %s, logical clock value is: %d\n",
+					asctime(timeinfo), *(pta->logical_clock_time));
+				write(pta->logfd, buf, n);
+				free(buf);
 			}
 			else if (r == 3) {
-
+				// send to both writefd1 and writefd2
+				int to_send = *(pta->logical_clock_time);
+				write(pta->writefd1, (char*)&to_send, 4);
+				write(pta->writefd2, (char*)&to_send, 4);
+				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
+				char* buf = malloc(100);
+				int n = sprintf(buf,
+					"System time is: %s, logical clock value is: %d\n",
+					asctime(timeinfo), *(pta->logical_clock_time));
+				write(pta->logfd, buf, n);
+				free(buf);
 			}
 			else {
-
+				// update the local logical clock
+				// log the internal event, system time, logical clock value
+				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
+				int n = sprintf(buf,
+					"System time is: %s, logical clock value is: %d\n",
+					asctime(timeinfo), *(pta->logical_clock_time));
+				write(pta->logfd, buf, n);
 			}
+		}
+		else {
+			// There is a message in the queue, process it
+			node* to_process = pop(pta->q);
+			// update local logical clock time
+			*(pta->logical_clock_time) = max(*(pta->logical_clock_time),
+				to_process->v.clock_time);
+			// write that it received message, global time, length of msg q,
+			// current logical clock time
+			
 		}
 		break;
 	}
