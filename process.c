@@ -233,6 +233,33 @@ void init_ll(ll* l) {
 	pthread_mutex_init(&l->lock, NULL);
 }
 
+void init_thread(int child, int writefd1, int writefd2, int readfd, char* logfile) {
+	ll* c_ll = malloc(sizeof(ll));
+	init_ll(c_ll);
+
+	int child_logical_clock_time = 0;
+	int fd = open(logfile, O_RDWR | O_CREAT, 0777);
+	write(fd, "CHILD START\n", 12);
+
+	// Argument to be passed into the processing thread
+	processing_thread_arg* p = malloc(sizeof(processing_thread_arg));
+	init_processing_thread_arg(p, &child_logical_clock_time,
+			writefd1, writefd2, fd, c_ll);
+
+	// Argument to be passed into the queue thread
+	queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
+	init_queue_thread_arg(qta, readfd, c_ll);
+
+	pthread_t qt;
+	pthread_t pt;
+	assert(pthread_create(&qt, NULL, queue_thread, (void*)qta) == 0);
+	assert(pthread_create(&pt, NULL, processing_thread, (void*)p) == 0);
+	pthread_join(pt, NULL);
+	pthread_join(qt, NULL);
+
+	free(p);
+}
+
 int main (int argc, char** argv) {
 	srand((unsigned)time(NULL));
 
@@ -243,7 +270,7 @@ int main (int argc, char** argv) {
 	int sv2[2];
 	int sv3[2];
 
-    assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv1) != -1);
+	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv1) != -1);
 	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv2) != -1);
 	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv3) != -1);
 
@@ -256,32 +283,7 @@ int main (int argc, char** argv) {
 	if (child1 == 0) {
 		// This child will write into sv2[0] and sv3[0]
 		// and read from sv1[1]
-
-		int child1_logical_clock_time = 0;
-		ll* c1_ll = malloc(sizeof(ll));
-		init_ll(c1_ll);
-
-		int fd1 = open("child1log.txt", O_RDWR | O_CREAT, 0777);
-		write(fd1, "CHILD 1 START\n", 15);
-
-		// Argument to be passed into the processing thread
-		processing_thread_arg* p = malloc(sizeof(processing_thread_arg));
-		init_processing_thread_arg(p, &child1_logical_clock_time,
-				sv2[0], sv3[0], fd1, c1_ll);
-
-		// Argument to be passed into the queue thread
-		queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
-		init_queue_thread_arg(qta, sv1[1], c1_ll);
-
-		// Create and start threads
-		pthread_t qt1;
-		pthread_t pt1;
-		assert(pthread_create(&qt1, NULL, queue_thread, (void*)qta) == 0);
-		assert(pthread_create(&pt1, NULL, processing_thread, (void*)p) == 0);
-		pthread_join(pt1, NULL);
-		pthread_join(qt1, NULL);
-
-		free(p);
+		init_thread(2, sv2[0], sv3[0], sv1[1], "child1log.txt");
 	}
 
 	pid_t child2 = fork();
@@ -289,31 +291,7 @@ int main (int argc, char** argv) {
 	if (child2 == 0) {
 		// This child will write into sv1[0] and sv3[0]
 		// and read from sv2[1]
-
-		ll* c2_ll = malloc(sizeof(ll));
-		init_ll(c2_ll);
-
-		int child2_logical_clock_time = 0;
-		int fd2 = open("child2log.txt", O_RDWR | O_CREAT, 0777);
-		write(fd2, "CHILD 2 START\n", 15);
-
-		// Argument to be passed into the processing thread
-		processing_thread_arg* p2 = malloc(sizeof(processing_thread_arg));
-		init_processing_thread_arg(p2, &child2_logical_clock_time,
-				sv1[0], sv3[0], fd2, c2_ll);
-
-		// Argument to be passed into the queue thread
-		queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
-		init_queue_thread_arg(qta, sv2[1], c2_ll);
-
-		pthread_t qt2;
-		pthread_t pt2;
-		assert(pthread_create(&qt2, NULL, queue_thread, (void*)qta) == 0);
-		assert(pthread_create(&pt2, NULL, processing_thread, (void*)p2) == 0);
-		pthread_join(pt2, NULL);
-		pthread_join(qt2, NULL);
-
-		free(p2);
+		init_thread(2, sv1[0], sv3[0], sv2[1], "child2log.txt");
 	}
 
 	pid_t child3 = fork();
@@ -321,31 +299,7 @@ int main (int argc, char** argv) {
 	if (child3 == 0) {
 		// This child will write into sv1[0] and sv2[0]
 		// and read from sv3[1]
-
-		ll* c3_ll = malloc(sizeof(ll));
-		init_ll(c3_ll);
-
-		int child3_logical_clock_time = 0;
-		int fd3 = open("child3log.txt", O_RDWR | O_CREAT, 0777);
-		write(fd3, "CHILD 3 START\n", 15);
-
-		// Argument to be passed into the processing thread
-		processing_thread_arg* p3 = malloc(sizeof(processing_thread_arg));
-		init_processing_thread_arg(p3, &child3_logical_clock_time,
-				sv1[0], sv2[0], fd3, c3_ll);
-
-		// Argument to be passed into the queue thread
-		queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
-		init_queue_thread_arg(qta, sv3[1], c3_ll);
-
-		pthread_t qt3;
-		pthread_t pt3;
-		assert(pthread_create(&qt3, NULL, queue_thread, (void*)qta) == 0);
-		assert(pthread_create(&pt3, NULL, processing_thread, (void*)p3) == 0);
-		pthread_join(pt3, NULL);
-		pthread_join(qt3, NULL);
-
-		free(p3);
+		init_thread(3, sv1[0], sv2[0], sv3[1], "child3log.txt");
 	}
 
 	waitpid(child1, NULL, 0);
