@@ -24,6 +24,7 @@ typedef struct node {
 
 typedef struct ll {
 	node* head;
+	node* tail;
 	int length;
 	pthread_mutex_t lock;
 } ll;
@@ -45,16 +46,29 @@ typedef struct processing_thread_arg {
 void push(value_type v, ll* l) {
 	node* new_node = malloc(sizeof(node));
 	new_node->v = v;
-	new_node->next = l->head;
-	l->head = new_node;
+	new_node->next = NULL;
+	pthread_mutex_lock(&l->lock);
+	if (l->head == NULL) {
+		l->head = new_node;
+		l->tail = new_node;
+	}
+	else {
+		l->tail->next = new_node;
+	}
 	++l->length;
+	pthread_mutex_unlock(&l->lock);
 }
 
 node* pop (ll* l) {
+	pthread_mutex_lock(&l->lock);
 	assert(l->head != NULL);
+	if (l->head == l->tail) {
+		l->tail = NULL;
+	}
 	node* ret = l->head;
 	l->head = l->head->next;
 	--l->length;
+	pthread_mutex_unlock(&l->lock);
 	return ret;
 }
 
@@ -70,12 +84,13 @@ void ll_test(void) {
 	value_type v3;
 	v3.test = 6;
 	push(v1, test_ll);
+	printf("%d\n", test_ll->length);
 	assert(test_ll->length == 1);
 	push(v2, test_ll);
 	push(v3, test_ll);
 
 	node* tmp = pop(test_ll);
-	assert((tmp->v).test == 6);
+	assert((tmp->v).test == 4);
 
 	node* cur = test_ll->head;
 	printf("should print:\n5\n4\n\n");
@@ -85,7 +100,7 @@ void ll_test(void) {
 	}
 	assert(test_ll->length == 2);
 
-	free(test_ll); // this is a mem leak but who cares.
+	free(test_ll);
 	printf("LL test looks good!\n");
 }
 
@@ -127,7 +142,7 @@ void* processing_thread(void* arg) {
 
 		// The queue is empty
 		if (pta->q->length == 0) {
-			int r = (rand() % 10) + 1;
+			int r = (rand() % 30) + 1;
 			if (r == 1) {
 				// send to writefd1
 				int to_send = *(pta->logical_clock_time);
@@ -248,6 +263,8 @@ void init_thread(int child, int writefd1, int writefd2, int readfd,
 
 int main (int argc, char** argv) {
 	srand((unsigned)time(NULL));
+
+	ll_test();
 
 	// Pre-generate random nubmers to avoid bugs.
 	int rand1 = (rand() % 6) + 1;
