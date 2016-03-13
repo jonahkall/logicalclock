@@ -54,6 +54,7 @@ void push(value_type v, ll* l) {
 	}
 	else {
 		l->tail->next = new_node;
+		l->tail = new_node;
 	}
 	++l->length;
 	pthread_mutex_unlock(&l->lock);
@@ -75,6 +76,7 @@ node* pop (ll* l) {
 void ll_test(void) {
 	ll* test_ll = malloc(sizeof(ll));
 	test_ll->head = NULL;
+	test_ll->tail = NULL;
 	test_ll->length = 0;
 
 	value_type v1;
@@ -84,16 +86,17 @@ void ll_test(void) {
 	value_type v3;
 	v3.test = 6;
 	push(v1, test_ll);
-	printf("%d\n", test_ll->length);
+	//printf("%d\n", test_ll->length);
 	assert(test_ll->length == 1);
 	push(v2, test_ll);
 	push(v3, test_ll);
+	assert(test_ll->length == 3);
 
 	node* tmp = pop(test_ll);
 	assert((tmp->v).test == 4);
 
 	node* cur = test_ll->head;
-	printf("should print:\n5\n4\n\n");
+	printf("should print:\n5\n6\n\n");
 	while (cur != NULL) {
 		printf("%d\n", (cur->v).test);
 		cur = cur->next;
@@ -142,8 +145,8 @@ void* processing_thread(void* arg) {
 
 		// The queue is empty
 		if (pta->q->length == 0) {
-			int r = (rand() % 30) + 1;
-			if (r == 1) {
+			int r = (rand() % 10) + 1;
+			if (r == 1 || r == 4) {
 				// send to writefd1
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
@@ -153,7 +156,7 @@ void* processing_thread(void* arg) {
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
 			}
-			else if (r == 2) {
+			else if (r == 2 || r == 5) {
 				// send to writefd2
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
@@ -163,7 +166,7 @@ void* processing_thread(void* arg) {
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
 			}
-			else if (r == 3) {
+			else if (r == 3 || r == 6) {
 				// Send to both writefd1 and writefd2.
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, (char*)&to_send, 4);
@@ -229,6 +232,7 @@ void init_processing_thread_arg(processing_thread_arg* p, int* lct, int wfd1,
 void init_ll(ll* l) {
 	l->head = NULL;
 	l->length = 0;
+	l->tail = NULL;
 	pthread_mutex_init(&l->lock, NULL);
 }
 
@@ -263,8 +267,6 @@ void init_thread(int child, int writefd1, int writefd2, int readfd,
 
 int main (int argc, char** argv) {
 	srand((unsigned)time(NULL));
-
-	ll_test();
 
 	// Pre-generate random nubmers to avoid bugs.
 	int rand1 = (rand() % 6) + 1;
