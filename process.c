@@ -12,8 +12,6 @@
 #include <time.h>
 #include <stdbool.h>
 
-#define MAX_MESSAGE_LENGTH 100
-
 typedef struct value_type {
 	// TODO: this is what's going to be the value in the ll
 	// which gets put on the queue.
@@ -102,11 +100,12 @@ int max(int x, int y) {
 
 void* queue_thread(void* arg) {
 	queue_thread_arg* qta = (queue_thread_arg*)arg;
-	void* buf = malloc(MAX_MESSAGE_LENGTH * sizeof(char));
 
+	int clock_time;
 	while (1) {
-		if (read(qta->readfd, buf, MAX_MESSAGE_LENGTH) > 0) {
+		if (read(qta->readfd, &clock_time, 4) > 0) {
 			value_type v;
+			v.clock_time = clock_time;
 			push(v, qta->q);
 		}
 	}
