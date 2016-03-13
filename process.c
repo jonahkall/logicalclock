@@ -12,6 +12,8 @@
 #include <time.h>
 #include <stdbool.h>
 
+#define MAX_MESSAGE_LENGTH 100
+
 typedef struct value_type {
 	// TODO: this is what's going to be the value in the ll
 	// which gets put on the queue.
@@ -30,7 +32,8 @@ typedef struct ll {
 } ll;
 
 typedef struct queue_thread_arg {
-	// TODO: anything we want to pass to the queue thr
+	ll* q;
+	int readfd;
 } queue_thread_arg;
 
 typedef struct processing_thread_arg {
@@ -98,12 +101,22 @@ int max(int x, int y) {
 }
 
 void* queue_thread(void* arg) {
+	queue_thread_arg* qta = (queue_thread_arg*)arg;
+	void* buf = malloc(MAX_MESSAGE_LENGTH * sizeof(char));
+
 	while (1) {
-		int j = 0;
+		if (read(qta->readfd, buf, MAX_MESSAGE_LENGTH) > 0) {
+			value_type v;
+			push(v, qta->q);
+		}
 	}
 	return NULL;
 }
 
+void init_queue_thread_arg(queue_thread_arg* qta, int readfd, ll* q) {
+	qta->readfd = readfd;
+	qta->q = q;
+}
 
 /*
 
@@ -216,7 +229,7 @@ void init_processing_thread_arg(processing_thread_arg* p, int* lct, int wfd1,
 
 int main (int argc, char** argv) {
 	srand((unsigned)time(NULL));
-	
+
 	// Set up bidirectional socket connections.
 	// We can then pass these into the various threads
 	// for communication purposes.
@@ -256,10 +269,14 @@ int main (int argc, char** argv) {
 		init_processing_thread_arg(p, &child1_logical_clock_time,
 				sv2[0], sv3[0], fd1, c1_ll);
 
+		// Argument to be passed into the queue thread
+		queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
+		init_queue_thread_arg(qta, sv1[1], c1_ll);
+
 		// Create and start threads
 		pthread_t qt1;
 		pthread_t pt1;
-		assert(pthread_create(&qt1, NULL, queue_thread, NULL) == 0);
+		assert(pthread_create(&qt1, NULL, queue_thread, (void*)qta) == 0);
 		assert(pthread_create(&pt1, NULL, processing_thread, (void*)p) == 0);
 		pthread_join(pt1, NULL);
 		pthread_join(qt1, NULL);
@@ -292,9 +309,13 @@ int main (int argc, char** argv) {
 		init_processing_thread_arg(p, &child2_logical_clock_time,
 				sv1[0], sv3[0], fd2, c2_ll);
 
+		// Argument to be passed into the queue thread
+		queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
+		init_queue_thread_arg(qta, sv2[1], c2_ll);
+
 		pthread_t qt2;
 		pthread_t pt2;
-		assert(pthread_create(&qt2, NULL, queue_thread, NULL) == 0);
+		assert(pthread_create(&qt2, NULL, queue_thread, (void*)qta) == 0);
 		assert(pthread_create(&pt2, NULL, processing_thread, (void*)p) == 0);
 		pthread_join(pt2, NULL);
 		pthread_join(qt2, NULL);
@@ -322,9 +343,13 @@ int main (int argc, char** argv) {
 		init_processing_thread_arg(p, &child3_logical_clock_time,
 				sv1[0], sv2[0], fd3, c3_ll);
 
+		// Argument to be passed into the queue thread
+		queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
+		init_queue_thread_arg(qta, sv3[1], c3_ll);
+
 		pthread_t qt3;
 		pthread_t pt3;
-		assert(pthread_create(&qt3, NULL, queue_thread, NULL) == 0);
+		assert(pthread_create(&qt3, NULL, queue_thread, (void*)qta) == 0);
 		assert(pthread_create(&pt3, NULL, processing_thread, (void*)p) == 0);
 		pthread_join(pt3, NULL);
 		pthread_join(qt3, NULL);
