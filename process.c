@@ -13,9 +13,7 @@
 #include <stdbool.h>
 
 typedef struct value_type {
-	// TODO: this is what's going to be the value in the ll
-	// which gets put on the queue.
-	int test;
+	int test; // For ll testing.
 	int clock_time;
 } value_type;
 
@@ -114,36 +112,6 @@ void* queue_thread(void* arg) {
 	return NULL;
 }
 
-void init_queue_thread_arg(queue_thread_arg* qta, int readfd, ll* q) {
-	qta->readfd = readfd;
-	qta->q = q;
-}
-
-/*
-
-On each clock cycle, if there is a message in the message queue for the machine
-(remember, the queue is not running at the same cycle speed) the virtual machine
-should take one message off the queue, update the local logical clock, and write
-that it received a message, the global time (gotten from the system), the length
-of the message queue, and the logical clock time.
-
-If there is no message in the queue, the virtual machine should generate a
-random number in the range of 1-10, and
-
-if the value is 1, send to one of the other machines a message that is the
-	local logical clock time, update it’s own logical clock, and update the
-	log with the send, the system time, and the logical clock time
-if the value is 2, send to the other virtual machine a message that is the
-	local logical clock time, update it’s own logical clock, and update the log
-	with the send, the system time, and the logical clock time.
-if the value is 3, send to both of the other virtual machines a message that is
-	the logical clock time, update it’s own logical clock, and update the log
-	with the send, the system time, and the logical clock time.
-if the value is other than 1-3, treat the cycle as an internal event; update
-	the local logical clock, and log the internal event, the system time, and
-	the logical clock value.
-*/
-
 void* processing_thread(void* arg) {
 	processing_thread_arg* pta = (processing_thread_arg*)arg;
 	// Open up sockets to the other processes to send msgs
@@ -156,9 +124,9 @@ void* processing_thread(void* arg) {
 		struct tm* timeinfo;
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
-		if (pta->q->length == 0) {
-			// The queue is empty
 
+		// The queue is empty
+		if (pta->q->length == 0) {
 			int r = (rand() % 10) + 1;
 			if (r == 1) {
 				// send to writefd1
@@ -181,7 +149,7 @@ void* processing_thread(void* arg) {
 				write(pta->logfd, buf, n);
 			}
 			else if (r == 3) {
-				// send to both writefd1 and writefd2
+				// Send to both writefd1 and writefd2.
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, (char*)&to_send, 4);
 				write(pta->writefd2, (char*)&to_send, 4);
@@ -192,8 +160,8 @@ void* processing_thread(void* arg) {
 				write(pta->logfd, buf, n);
 			}
 			else {
-				// update the local logical clock
-				// log the internal event, system time, logical clock value
+				// Update the local logical clock and log the
+				// internal event, system time, logical clock value.
 				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
 				int n = sprintf(buf,
 					"System time is: %slogical clock value is: %d\n",
@@ -205,13 +173,14 @@ void* processing_thread(void* arg) {
 		else {
 			// There is a message in the queue, process it
 			node* to_process = pop(pta->q);
-			// update local logical clock time
-			printf("%d %d\n", *(pta->logical_clock_time), to_process->v.clock_time);
+			// Update local logical clock time.
+			printf("%d %d\n", *(pta->logical_clock_time),
+				to_process->v.clock_time);
 			*(pta->logical_clock_time) = max(*(pta->logical_clock_time),
 				to_process->v.clock_time);
 			printf("%d\n", *(pta->logical_clock_time));
-			// write that it received message, global time, length of msg q,
-			// current logical clock time
+			// Write that it received message, global time, length of msg q,
+			// current logical clock time.
 			int n = sprintf(buf,
 				"Received Message! System time is: %slogical clock value is:"
 				" %d, length of message queue: %d\n\n",
@@ -220,6 +189,16 @@ void* processing_thread(void* arg) {
 		}
 	}
 	return NULL;
+}
+
+/*
+ * Functions to initialize threads and the data structures we
+ * pass into threads.
+*/
+
+void init_queue_thread_arg(queue_thread_arg* qta, int readfd, ll* q) {
+	qta->readfd = readfd;
+	qta->q = q;
 }
 
 void init_processing_thread_arg(processing_thread_arg* p, int* lct, int wfd1,
@@ -256,6 +235,7 @@ void init_thread(int child, int writefd1, int writefd2, int readfd,
 	queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
 	init_queue_thread_arg(qta, readfd, c_ll);
 
+	// Spin up queue and processing threads and wait for them.
 	pthread_t qt;
 	pthread_t pt;
 	assert(pthread_create(&qt, NULL, queue_thread, (void*)qta) == 0);
@@ -269,6 +249,7 @@ void init_thread(int child, int writefd1, int writefd2, int readfd,
 int main (int argc, char** argv) {
 	srand((unsigned)time(NULL));
 
+	// Pre-generate random nubmers to avoid bugs.
 	int rand1 = (rand() % 6) + 1;
 	int rand2 = (rand() % 6) + 1;
 	int rand3 = (rand() % 6) + 1;
@@ -279,13 +260,9 @@ int main (int argc, char** argv) {
 	int sv1[2];
 	int sv2[2];
 	int sv3[2];
-
 	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv1) != -1);
 	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv2) != -1);
 	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sv3) != -1);
-
-	// Test the very simple linked list implementation
-	//ll_test();
 
 	// Fork off three processes
 	pid_t child1 = fork();
