@@ -148,6 +148,7 @@ void* processing_thread(void* arg) {
 	processing_thread_arg* pta = (processing_thread_arg*)arg;
 	// Open up sockets to the other processes to send msgs
 	float speed = (float) pta->speed;
+	printf("speed: %f\n", speed);
 	while (1) {
 		usleep((1.0/speed) * 1000000);
 		char* buf = malloc(100); // this will hold the log message
