@@ -41,6 +41,7 @@ typedef struct processing_thread_arg {
 	int writefd1;
 	int writefd2;
 	int logfd;
+	int speed;
 } processing_thread_arg;
 
 void push(value_type v, ll* l) {
@@ -146,7 +147,7 @@ if the value is other than 1-3, treat the cycle as an internal event; update
 void* processing_thread(void* arg) {
 	processing_thread_arg* pta = (processing_thread_arg*)arg;
 	// Open up sockets to the other processes to send msgs
-	float speed = (float)((rand() % 6) + 1);
+	float speed = (float) pta->speed;
 	while (1) {
 		usleep((1.0/speed) * 1000000);
 		char* buf = malloc(100); // this will hold the log message
@@ -204,8 +205,10 @@ void* processing_thread(void* arg) {
 			// There is a message in the queue, process it
 			node* to_process = pop(pta->q);
 			// update local logical clock time
+			printf("%d %d\n", *(pta->logical_clock_time), to_process->v.clock_time);
 			*(pta->logical_clock_time) = max(*(pta->logical_clock_time),
 				to_process->v.clock_time);
+			printf("%d\n", *(pta->logical_clock_time));
 			// write that it received message, global time, length of msg q,
 			// current logical clock time
 			int n = sprintf(buf,
@@ -219,12 +222,13 @@ void* processing_thread(void* arg) {
 }
 
 void init_processing_thread_arg(processing_thread_arg* p, int* lct, int wfd1,
-		int wfd2, int lfd, ll* q) {
+		int wfd2, int lfd, ll* q, int randn) {
 	p->logical_clock_time = lct;
 	p->writefd1 = wfd1;
 	p->writefd2 = wfd2;
 	p->logfd = lfd;
 	p->q = q;
+	p->speed = randn;
 }
 
 void init_ll(ll* l) {
@@ -233,7 +237,8 @@ void init_ll(ll* l) {
 	pthread_mutex_init(&l->lock, NULL);
 }
 
-void init_thread(int child, int writefd1, int writefd2, int readfd, char* logfile) {
+void init_thread(int child, int writefd1, int writefd2, int readfd,
+		char* logfile, int randn) {
 	ll* c_ll = malloc(sizeof(ll));
 	init_ll(c_ll);
 
@@ -244,7 +249,7 @@ void init_thread(int child, int writefd1, int writefd2, int readfd, char* logfil
 	// Argument to be passed into the processing thread
 	processing_thread_arg* p = malloc(sizeof(processing_thread_arg));
 	init_processing_thread_arg(p, &child_logical_clock_time,
-			writefd1, writefd2, fd, c_ll);
+			writefd1, writefd2, fd, c_ll, randn);
 
 	// Argument to be passed into the queue thread
 	queue_thread_arg* qta = malloc(sizeof(queue_thread_arg));
@@ -262,6 +267,10 @@ void init_thread(int child, int writefd1, int writefd2, int readfd, char* logfil
 
 int main (int argc, char** argv) {
 	srand((unsigned)time(NULL));
+
+	int rand1 = (rand() % 6) + 1;
+	int rand2 = (rand() % 6) + 1;
+	int rand3 = (rand() % 6) + 1;
 
 	// Set up bidirectional socket connections.
 	// We can then pass these into the various threads
@@ -283,7 +292,7 @@ int main (int argc, char** argv) {
 	if (child1 == 0) {
 		// This child will write into sv2[0] and sv3[0]
 		// and read from sv1[1]
-		init_thread(2, sv2[0], sv3[0], sv1[1], "child1log.txt");
+		init_thread(2, sv2[0], sv3[0], sv1[1], "child1log.txt", rand1);
 	}
 
 	pid_t child2 = fork();
@@ -291,7 +300,7 @@ int main (int argc, char** argv) {
 	if (child2 == 0) {
 		// This child will write into sv1[0] and sv3[0]
 		// and read from sv2[1]
-		init_thread(2, sv1[0], sv3[0], sv2[1], "child2log.txt");
+		init_thread(2, sv1[0], sv3[0], sv2[1], "child2log.txt", rand2);
 	}
 
 	pid_t child3 = fork();
@@ -299,7 +308,7 @@ int main (int argc, char** argv) {
 	if (child3 == 0) {
 		// This child will write into sv1[0] and sv2[0]
 		// and read from sv3[1]
-		init_thread(3, sv1[0], sv2[0], sv3[1], "child3log.txt");
+		init_thread(3, sv1[0], sv2[0], sv3[1], "child3log.txt", rand3);
 	}
 
 	waitpid(child1, NULL, 0);
