@@ -192,11 +192,8 @@ void* processing_thread(void* arg) {
 			// There is a message in the queue, process it
 			node* to_process = pop(pta->q);
 			// Update local logical clock time.
-			printf("%d %d\n", *(pta->logical_clock_time),
-				to_process->v.clock_time);
 			*(pta->logical_clock_time) = max(*(pta->logical_clock_time),
 				to_process->v.clock_time);
-			printf("%d\n", *(pta->logical_clock_time));
 			// Write that it received message, global time, length of msg q,
 			// current logical clock time.
 			int n = sprintf(buf,
