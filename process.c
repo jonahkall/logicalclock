@@ -146,7 +146,7 @@ void* processing_thread(void* arg) {
 		// The queue is empty
 		if (pta->q->length == 0) {
 			int r = (rand() % 10) + 1;
-			if (r == 1 || r == 4) {
+			if (r == 1) {
 				// send to writefd1
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
@@ -156,7 +156,7 @@ void* processing_thread(void* arg) {
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
 			}
-			else if (r == 2 || r == 5) {
+			else if (r == 2) {
 				// send to writefd2
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
@@ -166,7 +166,7 @@ void* processing_thread(void* arg) {
 					asctime(timeinfo), *(pta->logical_clock_time));
 				write(pta->logfd, buf, n);
 			}
-			else if (r == 3 || r == 6) {
+			else if (r == 3) {
 				// Send to both writefd1 and writefd2.
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, (char*)&to_send, 4);

@@ -1,8 +1,5 @@
 # logicalclock
 logical clock implementation
 
-Hey Matt --
-to compile but not run, 
-to run things just say "make run"
-"make clean" to clean up
-
+To compile and run a simulation, simply type "make run," "make clean" to clean up, and
+just "make" to compile.
