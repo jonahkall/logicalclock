@@ -13,7 +13,6 @@
 #include <stdbool.h>
 
 typedef struct value_type {
-	int test; // For ll testing.
 	int clock_time;
 } value_type;
 
@@ -73,47 +72,8 @@ node* pop (ll* l) {
 	return ret;
 }
 
-void ll_test(void) {
-	ll* test_ll = malloc(sizeof(ll));
-	test_ll->head = NULL;
-	test_ll->tail = NULL;
-	test_ll->length = 0;
-
-	value_type v1;
-	v1.test = 4;
-	value_type v2;
-	v2.test = 5;
-	value_type v3;
-	v3.test = 6;
-	push(v1, test_ll);
-	//printf("%d\n", test_ll->length);
-	assert(test_ll->length == 1);
-	push(v2, test_ll);
-	push(v3, test_ll);
-	assert(test_ll->length == 3);
-
-	node* tmp = pop(test_ll);
-	assert((tmp->v).test == 4);
-
-	node* cur = test_ll->head;
-	printf("should print:\n5\n6\n\n");
-	while (cur != NULL) {
-		printf("%d\n", (cur->v).test);
-		cur = cur->next;
-	}
-	assert(test_ll->length == 2);
-
-	free(test_ll);
-	printf("LL test looks good!\n");
-}
-
 int max(int x, int y) {
-	if (x > y) {
-		return x;
-	}
-	else {
-		return y;
-	}
+	return x > y ? x : y;
 }
 
 void* queue_thread(void* arg) {
@@ -132,9 +92,8 @@ void* queue_thread(void* arg) {
 
 void* processing_thread(void* arg) {
 	processing_thread_arg* pta = (processing_thread_arg*)arg;
-	// Open up sockets to the other processes to send msgs
+	// Open up sockets to the other processes to send messages.
 	float speed = (float) pta->speed;
-	printf("speed: %f\n", speed);
 	while (1) {
 		usleep((1.0/speed) * 1000000);
 		char* buf = malloc(100); // this will hold the log message
@@ -143,11 +102,11 @@ void* processing_thread(void* arg) {
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
 
-		// The queue is empty
 		if (pta->q->length == 0) {
+			// The queue is empty.
 			int r = (rand() % 10) + 1;
 			if (r == 1) {
-				// send to writefd1
+				// Send to just writefd1.
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
 				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
@@ -157,7 +116,7 @@ void* processing_thread(void* arg) {
 				write(pta->logfd, buf, n);
 			}
 			else if (r == 2) {
-				// send to writefd2
+				// Send to just writefd2.
 				int to_send = *(pta->logical_clock_time);
 				write(pta->writefd1, &to_send, 4);
 				*(pta->logical_clock_time) = (*(pta->logical_clock_time)) + 1;
